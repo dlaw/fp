@@ -4,9 +4,9 @@ overflow safety and bit shift correctness, and zero runtime overhead.
 Please note: this crate requires nightly Rust, for the `generic_const_exprs`
 feature. In addition, this is an "alpha" release with incomplete documentation
 and incomplete test coverage.  The [fixed](https://crates.io/crates/fixed)
-package provides a widely-used, production-ready option for fixed-point
-arithmetic -- although it does not provide compile-time overflow safety, nor the
-guarantee of zero runtime overhead.
+crate provides a widely-used, production-ready option for fixed-point arithmetic
+-- although it does not provide compile-time overflow safety, nor the guarantee
+of zero runtime overhead.
 
 Fixed-point arithmetic represents fractional values as integers with an implicit
 bit shift.  For example, the decimal number 2.375 (in base 2: 10.011) could
@@ -30,10 +30,3 @@ operation is implemented with an output type which correctly reflects the bits
 and shift of the result.  For example, the result of multiplying a 10-bit number
 (shifted by 2) and a 12-bit number (shifted by 3) is a 22-bit number (shifted
 by 5).
-
-The `fp::Num` trait represents any fixed-point number stored as an integer,
-and the generic structs `fp::X??<const BITS: u32, const SHIFT: i32>` implement
-the `fp::Num` trait for each width and shift of fixed-point number which could
-be represented by the integer type `x??`.  Arithmetic operations on the
-fixed-point types are guaranteed to provide correctness and overflow safety with
-zero runtime overhead.

@@ -16,14 +16,14 @@ fn main() {
     // Arithmetic works pretty much seamlessly
     let a = 12i32.set_bits::<5>().unwrap();
     let b = (-1i32).set_bits::<1>().unwrap();
-    let c = a + b; // type of C is I32<6, 0>
+    let _ = a + b; // type is I32<6, 0>
 
     // Addition is associative in value, but not in type
-    let d: fp::I32<6, 0> = a + (b + b);
-    let e: fp::I32<7, 0> = (a + b) + b;
+    let _: fp::I32<6, 0> = a + (b + b);
+    let _: fp::I32<7, 0> = (a + b) + b;
 
     let x = fp::I32::<21, 20>::from_f32(0.497).unwrap();
-    let y = x.div_const::<12>();
+    let y = x / fp::I32::<32, 0>::new(12).unwrap();
     let z = x + (-y);
     println!("{} {}", x.raw(), x.into_f64());
     println!("{} {}", z.raw(), z.into_f64());

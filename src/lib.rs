@@ -35,6 +35,7 @@
 
 #![feature(generic_const_exprs)]
 
+use core::fmt::Debug;
 use core::ops::{Shl, Shr};
 
 #[derive(Debug)]
@@ -46,13 +47,12 @@ pub enum RangeError {
 /// A fixed-point number, stored as type `Raw`,
 /// where only the `BITS` least-significant bits may be nonzero.
 /// The raw value is divided by `2.pow(SHIFT)` to obtain the logical value.
-pub trait Num: Clone + Copy + Eq + Ord + PartialEq + PartialOrd + Sized {
+pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized {
     /// The underlying ("raw") representation of this fixed-point number.
     /// Typically this is a primitive integer type, e.g. `i64`.
     type Raw: Num<Raw = Self::Raw> + Shl<u32, Output = Self::Raw> + Shr<u32, Output = Self::Raw>;
     /// The type that this fixed point number will become after `BITS` and/or `SHIFT`
-    /// are changed by an operation.  Typically this is one of the `Num*` structs, e.g.
-    /// `I64`.
+    /// are changed by an operation.
     type Output<const B: u32, const S: i32>: Num<Raw = Self::Raw>;
     /// `BITS` is the number of least-significant bits which are permitted to vary.
     /// The `Raw::BITS - BITS` high-order bits must be zero (for unsigned `Raw`) or the
@@ -98,6 +98,8 @@ pub trait Num: Clone + Copy + Eq + Ord + PartialEq + PartialOrd + Sized {
     /// or return a RangeError if `val` is too small or too large to be represented
     /// by `Self`.
     fn from_f32(val: f32) -> Result<Self, RangeError> {
+        assert!(val.is_finite());
+        // TODO: handle fp types where MIN/MAX don't fit in f32
         if val < Self::MIN.into_f32() {
             Err(RangeError::TooSmall)
         } else if val > Self::MAX.into_f32() {
@@ -111,6 +113,8 @@ pub trait Num: Clone + Copy + Eq + Ord + PartialEq + PartialOrd + Sized {
     /// or return a RangeError if `val` is too small or too large to be represented
     /// by `Self`.
     fn from_f64(val: f64) -> Result<Self, RangeError> {
+        assert!(val.is_finite());
+        // TODO: handle fp types where MIN/MAX don't fit in f64
         if val < Self::MIN.into_f64() {
             Err(RangeError::TooSmall)
         } else if val > Self::MAX.into_f64() {
@@ -120,9 +124,9 @@ pub trait Num: Clone + Copy + Eq + Ord + PartialEq + PartialOrd + Sized {
         }
     }
     unsafe fn from_f64_unchecked(val: f64) -> Self;
-    /// Return the logical value of `Self` as `f32`. Truncation is possible.
+    /// Return the logical value of `Self` as `f32`. Return value is guaranteed to be exact.
     fn into_f32(self) -> f32;
-    /// Return the logical value of `Self` as `f64`. Truncation is possible.
+    /// Return the logical value of `Self` as `f64`. Return value is guaranteed to be exact.
     fn into_f64(self) -> f64;
     /// Return the fixed-point number of type `Self` which has the same logical value as `val`.
     /// `F` and `Self` must have the same shift and signedness. `Self` must have at least as
@@ -216,7 +220,7 @@ pub trait Num: Clone + Copy + Eq + Ord + PartialEq + PartialOrd + Sized {
     }
 }
 
-mod fp_impl;
-pub use fp_impl::*;
+mod num_impl;
+pub use num_impl::*;
 mod add_sub;
 mod mul_div;

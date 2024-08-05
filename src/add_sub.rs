@@ -2,8 +2,8 @@ use core::ops::{Add, Neg, Sub};
 
 use crate::Num;
 
-/// Needed for const-generic support, because the standard
-/// ways to compute maximum of two values are not const.
+/// Needed for const-generic support, because the built-in
+/// methods to compute maximum of two values are not const.
 pub const fn max(a: u32, b: u32) -> u32 {
     if a > b {
         a
@@ -26,9 +26,7 @@ macro_rules! fp_impl {
             fn add(self: $Name<B0, S>, other: $Name<B1, S>) -> Self::Output {
                 unsafe {
                     Self::Output::new_unchecked(
-                        // use wrapping_sub to ensure we don't do overflow checks
-                        // (overflow safety is guaranteed by the type system)
-                        self.raw().wrapping_add(other.raw()),
+                        self.raw().unchecked_add(other.raw()),
                     )
                 }
             }
@@ -44,22 +42,23 @@ macro_rules! fp_impl {
             // Subtraction output is always signed, even for unsigned inputs.
             type Output = $Iname<{ max(B0, B1) + 1 }, S>;
             fn sub(self: $Name<B0, S>, other: $Name<B1, S>) -> Self::Output {
+                // Convert raw values to signed prior to subtracting.
+                let self_raw = self.raw() as <Self::Output as Num>::Raw;
+                let other_raw = other.raw() as <Self::Output as Num>::Raw;
                 unsafe {
                     Self::Output::new_unchecked(
-                        // use wrapping_sub to ensure we don't do overflow checks
-                        // (overflow safety is guaranteed by the type system)
-                        self.raw().wrapping_sub(other.raw()) as <Self::Output as Num>::Raw,
+                        self_raw.unchecked_sub(other_raw),
                     )
                 }
             }
         }
+        /// Any fixed-point integer may be negated.  The result of negation is always
+        /// signed.  Negation adds a bit: unsigned values gain a sign bit; signed values
+        /// can overflow from `MIN` to `-MIN = MAX + 1`.  The shift is unchanged.
         impl<const B: u32, const S: i32> Neg for $Name<B, S>
         where
             [(); (B + 1) as usize]:,
         {
-            // Negation output is always signed, even for unsigned inputs.
-            // Negation adds a bit: unsigned values gain a sign bit;
-            // signed values can overflow from MIN to -MIN = MAX + 1.
             type Output = $Iname<{ B + 1 }, S>;
             fn neg(self: $Name<B, S>) -> Self::Output {
                 unsafe { Self::Output::new_unchecked(-(self.raw() as <Self::Output as Num>::Raw)) }
