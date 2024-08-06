@@ -4,49 +4,6 @@ use crate::*;
 // we have to use a macro for the impls instead of writing one generic impl.
 macro_rules! num_impl {
     ($Name:ident, $T:ty) => {
-        /// Every integer is also a fixed-point number, considered to have
-        /// the maximum number of bits and zero shift.
-        impl Num for $T {
-            type Raw = $T;
-            const BITS: u32 = <$T>::BITS;
-            const SHIFT: i32 = 0;
-            const MIN: $T = <$T>::MIN;
-            const ZERO: $T = 0;
-            const MAX: $T = <$T>::MAX;
-            #[allow(unused_comparisons)]
-            const SIGNED: bool = <$T>::MIN < 0;
-            unsafe fn new_unchecked(val: $T) -> Self {
-                val
-            }
-            unsafe fn from_f32_unchecked(val: f32) -> Self {
-                val.to_int_unchecked()
-            }
-            unsafe fn from_f64_unchecked(val: f64) -> Self {
-                val.to_int_unchecked()
-            }
-            fn raw(self) -> $T {
-                self
-            }
-            /// Conversion to f32 is guaranteed to be exact.  Therefore, this function only
-            /// works for integer types which are <= 24 bits wide.
-            fn into_f32(self) -> f32 {
-                assert!(
-                    Self::BITS <= f32::MANTISSA_DIGITS,
-                    "number could be truncated in f32"
-                );
-                self as f32
-            }
-            /// Conversion to f64 is guaranteed to be exact.  Therefore, this function only
-            /// works for integer types which are <= 53 bits wide.
-            fn into_f64(self) -> f64 {
-                assert!(
-                    Self::BITS <= f32::MANTISSA_DIGITS,
-                    "number could be truncated in f64"
-                );
-                self as f64
-            }
-        }
-
         #[repr(transparent)]
         #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
         /// [`#[repr(transparent)]`](https://doc.rust-lang.org/reference/type-layout.html#the-transparent-representation)
@@ -81,7 +38,7 @@ macro_rules! num_impl {
                     <$T>::MAX >> (<$T>::BITS - Self::BITS)
                 }
             });
-            const SIGNED: bool = <$T>::SIGNED;
+            const SIGNED: bool = <$T as Int>::SIGNED;
             unsafe fn new_unchecked(val: $T) -> Self {
                 let _ = Self::BITS;  // force the compile-time check that T is wide enough for BITS
                 Self(val)

@@ -36,7 +36,6 @@
 //#![feature(generic_const_exprs)]
 
 use core::fmt::Debug;
-use core::ops::{Shl, Shr};
 
 #[derive(Debug)]
 pub enum RangeError {
@@ -50,7 +49,7 @@ pub enum RangeError {
 pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized {
     /// The underlying ("raw") representation of this fixed-point number.
     /// Typically this is a primitive integer type, e.g. `i64`.
-    type Raw: Num<Raw = Self::Raw> + Shl<u32, Output = Self::Raw> + Shr<u32, Output = Self::Raw>;
+    type Raw: Int;
     /// `BITS` is the number of least-significant bits which are permitted to vary.
     /// The `Raw::BITS - BITS` high-order bits must be zero (for unsigned `Raw`) or the
     /// same as the high bit of the lower `BITS` bits (for signed `Raw`).
@@ -162,10 +161,14 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     fn into_fp<F: Num<Raw: TryFrom<Self::Raw>>>(self) -> F {
         F::from_fp(self)
     }
+
     /// Increase the number of bits used to represent this value. Both the raw and logical
     /// values are unchanged.  This is a type system operation only.
     /// Compilation will fail if the new number of bits is too large for the raw type.
     fn add_bits<T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            // TODO
+        }
         unsafe { T::new_unchecked(self.raw()) }
     }
     /// Set the number of bits used to represent this value. The value is checked
@@ -244,43 +247,36 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     }
 
     // todo: generalize the trait bounds to allow adding and subtrating signed/unsigned?
-    fn add<Other: Num, Output: Num>(self, other: Other) -> Output
-    where
-        Self::Raw: core::ops::Add<Other::Raw, Output = Output::Raw>,
-    {
+    fn add<Other: Num<Raw = Self::Raw>, Output: Num<Raw = Self::Raw>>(
+        self,
+        other: Other,
+    ) -> Output {
         const {
             assert!(Output::SHIFT == Self::SHIFT);
             assert!(Output::SHIFT == Other::SHIFT);
-            if Output::SIGNED {
-                assert!(Output::BITS > Self::BITS + !Self::SIGNED as u32);
-                assert!(Output::BITS > Other::BITS + !Other::SIGNED as u32);
-            } else {
-                assert!(Self::SIGNED == false);
-                assert!(Other::SIGNED == false);
-                assert!(Output::BITS > Self::BITS);
-                assert!(Output::BITS > Other::BITS);
-            }
+            assert!(Output::SIGNED == Self::SIGNED);
+            assert!(Output::SIGNED == Other::SIGNED);
+            assert!(Output::BITS > Self::BITS);
+            assert!(Output::BITS > Other::BITS);
         }
-        unsafe { Output::new_unchecked(self.raw() + other.raw()) }
+        unsafe { Output::new_unchecked(self.raw().unchecked_add(other.raw())) }
     }
 
-    fn sub<Other: Num, Output: Num>(self, other: Other) -> Output
-    where
-        Self::Raw: TryInto<Output::Raw>,
-        Other::Raw: TryInto<Output::Raw>,
-        Output::Raw: core::ops::Sub<Output::Raw, Output = Output::Raw>,
-    {
+    fn sub<Other: Num<Raw = Self::Raw>, Output: Num<Raw = <Self::Raw as Int>::Signed>>(
+        self,
+        other: Other,
+    ) -> Output {
         const {
             assert!(Output::SHIFT == Self::SHIFT);
             assert!(Output::SHIFT == Other::SHIFT);
             assert!(Output::SIGNED);
-            assert!(Output::BITS > Self::BITS + (Self::SIGNED != Other::SIGNED) as u32);
-            assert!(Output::BITS > Other::BITS + (Self::SIGNED != Other::SIGNED) as u32);
+            assert!(Self::SIGNED == Other::SIGNED);
         }
         unsafe {
             Output::new_unchecked(
-                self.raw().try_into().unwrap_unchecked()
-                    - other.raw().try_into().unwrap_unchecked(),
+                self.raw()
+                    .as_signed()
+                    .unchecked_sub(other.raw().as_signed()),
             )
         }
     }
@@ -288,3 +284,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
 
 mod types;
 pub use types::*;
+
+mod int;
+pub use int::*;
