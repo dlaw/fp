@@ -1,6 +1,6 @@
 [package]
 name = "fp"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["David Lawrence <dlaw@dlaw.me>"]
 license = "MIT"
@@ -8,3 +8,4 @@ repository = "https://github.com/dlaw/fp/"
 description = "Fast & safe fixed-point arithmetic via compile-time checks"
 categories = ["embedded", "no-std"]
 keywords = ["embedded", "fixed", "math", "numerics"]
+rust-version = "1.79"

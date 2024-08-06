@@ -1,23 +1,23 @@
-use core::fmt::Debug;
-use core::ops::{Shl, Shr};
+// This file is a bunch of boilerplate which we need because the Rust
+// standard library doesn't include a trait for basic integer functions.
 
 pub trait Int:
     Clone
     + Copy
-    + Debug
+    + core::fmt::Debug
     + Eq
     + Ord
     + PartialEq
     + PartialOrd
-    + Shl<u32, Output = Self>
-    + Shr<u32, Output = Self>
+    + core::ops::Shl<u32, Output = Self>
+    + core::ops::Shr<u32, Output = Self>
     + Sized
 {
     const MIN: Self;
     const ZERO: Self;
     const MAX: Self;
     const BITS: u32;
-    const SIGNED: bool;
+    const IS_SIGNED: bool;
     type Signed: Int;
     fn as_signed(self) -> Self::Signed;
     unsafe fn unchecked_add(self, other: Self) -> Self;
@@ -36,7 +36,7 @@ macro_rules! int_impl {
             const MAX: $T = <$T>::MAX;
             const BITS: u32 = <$T>::BITS;
             #[allow(unused_comparisons)]
-            const SIGNED: bool = <$T>::MIN < 0;
+            const IS_SIGNED: bool = <$T>::MIN < 0;
             type Signed = $Signed;
             fn as_signed(self) -> $Signed {
                 self as $Signed
@@ -85,7 +85,7 @@ impl<T: Int> crate::Num for T {
     const MIN: Self = Self::MIN;
     const ZERO: Self = Self::ZERO;
     const MAX: Self = Self::MAX;
-    const SIGNED: bool = Self::SIGNED;
+    const SIGNED: bool = Self::IS_SIGNED;
     unsafe fn new_unchecked(val: Self) -> Self {
         val
     }

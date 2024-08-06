@@ -38,7 +38,7 @@ macro_rules! num_impl {
                     <$T>::MAX >> (<$T>::BITS - Self::BITS)
                 }
             });
-            const SIGNED: bool = <$T as Int>::SIGNED;
+            const SIGNED: bool = <$T as Int>::IS_SIGNED;
             unsafe fn new_unchecked(val: $T) -> Self {
                 let _ = Self::BITS;  // force the compile-time check that T is wide enough for BITS
                 Self(val)
@@ -64,18 +64,18 @@ macro_rules! num_impl {
             /// to reduce the number of bits and `logical_shr()` to adjust the shift as needed.
             fn into_f32(self) -> f32 {
                 const {
-                assert!(
-                    BITS <= f32::MANTISSA_DIGITS,
-                    "number could be truncated in f32"
-                );
-                assert!(
-                    SHIFT <= f32::MANTISSA_DIGITS as i32 - f32::MIN_EXP,
-                    "number could underflow f32"
-                );
-                assert!(
-                    BITS as i32 - SHIFT <= f32::MAX_EXP as i32,
-                    "number could overflow f32"
-                );
+                    assert!(
+                        BITS <= f32::MANTISSA_DIGITS,
+                        "number could be truncated in f32"
+                    );
+                    assert!(
+                        SHIFT <= f32::MANTISSA_DIGITS as i32 - f32::MIN_EXP,
+                        "number could underflow f32"
+                    );
+                    assert!(
+                        BITS as i32 - SHIFT <= f32::MAX_EXP as i32,
+                        "number could overflow f32"
+                    );
                 }
                 // `BITS == 0` requires special handling because, in this case only,
                 // `f32_lsb::<SHIFT>()` can overflow f32 (resulting in 0 * infinity).
@@ -89,18 +89,18 @@ macro_rules! num_impl {
             /// to reduce the number of bits and `logical_shr()` to adjust the shift as needed.
             fn into_f64(self) -> f64 {
                 const {
-                assert!(
-                    BITS <= f64::MANTISSA_DIGITS,
-                    "number could be truncated in f64"
-                );
-                assert!(
-                    SHIFT <= f64::MANTISSA_DIGITS as i32 - f64::MIN_EXP,
-                    "number could underflow f64"
-                );
-                assert!(
-                    BITS as i32 - SHIFT <= f64::MAX_EXP as i32,
-                    "number could overflow f64"
-                );
+                    assert!(
+                        BITS <= f64::MANTISSA_DIGITS,
+                        "number could be truncated in f64"
+                    );
+                    assert!(
+                        SHIFT <= f64::MANTISSA_DIGITS as i32 - f64::MIN_EXP,
+                        "number could underflow f64"
+                    );
+                    assert!(
+                        BITS as i32 - SHIFT <= f64::MAX_EXP as i32,
+                        "number could overflow f64"
+                    );
                 }
                 // `BITS == 0` requires special handling because, in this case only,
                 // `f64_lsb::<SHIFT>()` can overflow f64 (resulting in 0 * infinity).

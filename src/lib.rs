@@ -190,7 +190,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     unsafe fn set_bits_unchecked<T: Num<Raw = Self::Raw>>(self) -> T {
         const {
             assert!(Self::SHIFT == T::SHIFT);
-            assert!(Self::SIGNED == T::SIGNED);
         }
         unsafe { T::new_unchecked(self.raw()) }
     }
@@ -210,7 +209,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(T::BITS >= Self::BITS);
             assert!(T::SHIFT == Self::SHIFT - N);
-            assert!(T::SIGNED == Self::SIGNED);
         }
         unsafe { T::new_unchecked(self.raw()) }
     }
@@ -221,7 +219,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(T::BITS >= Self::BITS);
             assert!(T::SHIFT == Self::SHIFT + N);
-            assert!(T::SIGNED == Self::SIGNED);
         }
         unsafe { T::new_unchecked(self.raw()) }
     }
@@ -231,7 +228,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(T::BITS - Self::BITS >= N);
             assert!((T::SHIFT - Self::SHIFT) as u32 == N);
-            assert!(T::SIGNED == Self::SIGNED);
         }
         unsafe { T::new_unchecked(self.raw() << N) }
     }
@@ -241,12 +237,10 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(Self::BITS - T::BITS <= N);
             assert!((Self::SHIFT - T::SHIFT) as u32 == N);
-            assert!(T::SIGNED == Self::SIGNED);
         }
         unsafe { T::new_unchecked(self.raw() >> N) }
     }
 
-    // todo: generalize the trait bounds to allow adding and subtrating signed/unsigned?
     fn add<Other: Num<Raw = Self::Raw>, Output: Num<Raw = Self::Raw>>(
         self,
         other: Other,
@@ -254,8 +248,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(Output::SHIFT == Self::SHIFT);
             assert!(Output::SHIFT == Other::SHIFT);
-            assert!(Output::SIGNED == Self::SIGNED);
-            assert!(Output::SIGNED == Other::SIGNED);
             assert!(Output::BITS > Self::BITS);
             assert!(Output::BITS > Other::BITS);
         }
@@ -269,8 +261,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
         const {
             assert!(Output::SHIFT == Self::SHIFT);
             assert!(Output::SHIFT == Other::SHIFT);
-            assert!(Output::SIGNED);
-            assert!(Self::SIGNED == Other::SIGNED);
         }
         unsafe {
             Output::new_unchecked(
