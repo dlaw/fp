@@ -1,6 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
-
 use fp::*;
 
 fn check_f32<T: Num>(raw: T::Raw, float: f32) {
@@ -84,48 +81,4 @@ fn extreme_floats() {
         (core::f64::consts::PI * 2_f64.powi(f64::MANTISSA_DIGITS as i32 - 2)) as u64,
         core::f64::consts::PI,
     );
-}
-
-#[test]
-#[should_panic(expected = "number could overflow f32")]
-fn f32_overflow() {
-    let num: I32<{ f32::MANTISSA_DIGITS }, { MIN_F32_SHIFT - 1 }> =
-        unsafe { I32::new_unchecked(0) };
-    let _ = num.into_f32();
-}
-
-#[test]
-#[should_panic(expected = "number could overflow f64")]
-fn f64_overflow() {
-    let num: Usize<0, { -f64::MAX_EXP - 1 }> = unsafe { Usize::new_unchecked(0) };
-    let _ = num.into_f64();
-}
-
-#[test]
-#[should_panic(expected = "number could underflow f32")]
-fn f32_underflow() {
-    let num: I8<0, { MAX_F32_SHIFT + 1 }> = unsafe { I8::new_unchecked(0) };
-    let _ = num.into_f32();
-}
-
-#[test]
-#[should_panic(expected = "number could underflow f64")]
-fn f64_underflow() {
-    let num: I128<{ f64::MANTISSA_DIGITS }, { MAX_F64_SHIFT + 1 }> =
-        unsafe { I128::new_unchecked(0) };
-    let _ = num.into_f64();
-}
-
-#[test]
-#[should_panic(expected = "number could be truncated in f32")]
-fn f32_truncation() {
-    let num: U32<{ f32::MANTISSA_DIGITS + 1 }, 0> = unsafe { U32::new_unchecked(0) };
-    let _ = num.into_f32();
-}
-
-#[test]
-#[should_panic(expected = "number could be truncated in f64")]
-fn f64_truncation() {
-    let num: I64<{ f64::MANTISSA_DIGITS + 1 }, 0> = unsafe { I64::new_unchecked(0) };
-    let _ = num.into_f64();
 }

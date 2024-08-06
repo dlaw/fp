@@ -33,7 +33,7 @@
 //! `generic_const_exprs` feature.  Otherwise it would not be possible to specify
 //! the correct return type from most operations.
 
-#![feature(generic_const_exprs)]
+//#![feature(generic_const_exprs)]
 
 use core::fmt::Debug;
 use core::ops::{Shl, Shr};
@@ -51,9 +51,6 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     /// The underlying ("raw") representation of this fixed-point number.
     /// Typically this is a primitive integer type, e.g. `i64`.
     type Raw: Num<Raw = Self::Raw> + Shl<u32, Output = Self::Raw> + Shr<u32, Output = Self::Raw>;
-    /// The type that this fixed point number will become after `BITS` and/or `SHIFT`
-    /// are changed by an operation.
-    type Output<const B: u32, const S: i32>: Num<Raw = Self::Raw>;
     /// `BITS` is the number of least-significant bits which are permitted to vary.
     /// The `Raw::BITS - BITS` high-order bits must be zero (for unsigned `Raw`) or the
     /// same as the high bit of the lower `BITS` bits (for signed `Raw`).
@@ -69,6 +66,8 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     const SHIFT: i32;
     /// Minimum possible value of this type.
     const MIN: Self;
+    /// Zero value of this type.
+    const ZERO: Self;
     /// Maximum possible value of this type.
     const MAX: Self;
     /// Whether this type is signed. (If false, it's unsigned.)
@@ -96,10 +95,13 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     fn raw(self) -> Self::Raw;
     /// Return the fixed-point number of type `Self` which has a logical value of `val`,
     /// or return a RangeError if `val` is too small or too large to be represented
-    /// by `Self`.
+    /// by `Self`. Panics on non-finite input.
     fn from_f32(val: f32) -> Result<Self, RangeError> {
-        assert!(val.is_finite());
-        // TODO: handle fp types where MIN/MAX don't fit in f32
+        assert!(
+            val.is_finite(),
+            "can't convert non-finite float {} into fixed point",
+            val
+        );
         if val < Self::MIN.into_f32() {
             Err(RangeError::TooSmall)
         } else if val > Self::MAX.into_f32() {
@@ -111,10 +113,13 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     unsafe fn from_f32_unchecked(val: f32) -> Self;
     /// Return the fixed-point number of type `Self` which has a logical value of `val`,
     /// or return a RangeError if `val` is too small or too large to be represented
-    /// by `Self`.
+    /// by `Self`. Panics on non-finite input.
     fn from_f64(val: f64) -> Result<Self, RangeError> {
-        assert!(val.is_finite());
-        // TODO: handle fp types where MIN/MAX don't fit in f64
+        assert!(
+            val.is_finite(),
+            "can't convert non-finite float {} into fixed point",
+            val
+        );
         if val < Self::MIN.into_f64() {
             Err(RangeError::TooSmall)
         } else if val > Self::MAX.into_f64() {
@@ -128,41 +133,50 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     fn into_f32(self) -> f32;
     /// Return the logical value of `Self` as `f64`. Return value is guaranteed to be exact.
     fn into_f64(self) -> f64;
+
     /// Return the fixed-point number of type `Self` which has the same logical value as `val`.
     /// `F` and `Self` must have the same shift and signedness. `Self` must have at least as
     /// many bits as `F`.
-    fn from_fp<T: Num, F: Num<Raw = T>>(val: F) -> Self
+    fn from_fp<F: Num>(val: F) -> Self
     where
-        Self::Raw: TryFrom<T>,
+        Self::Raw: TryFrom<F::Raw>,
     {
-        assert!(Self::SHIFT == F::SHIFT);
-        assert!(Self::BITS >= F::BITS);
-        assert!(Self::SIGNED == F::SIGNED);
-        unsafe { Self::new_unchecked(val.raw().try_into().ok().unwrap()) }
+        const {
+            assert!(Self::SHIFT == F::SHIFT);
+            assert!(Self::BITS >= F::BITS);
+            if Self::SIGNED == false {
+                assert!(F::SIGNED == false);
+            } else if F::SIGNED == false {
+                // converting unsigned to signed -- needs at least 1 extra bit
+                assert!(
+                    Self::BITS > F::BITS,
+                    "must add at least 1 bit to convert unsigned to signed"
+                );
+            }
+        }
+        unsafe { Self::new_unchecked(val.raw().try_into().unwrap_unchecked()) }
     }
     /// Return the fixed-point number of type `F` which has the same logical value as `self`.
     /// `F` and `Self` must have the same shift and signedness. `F` must have at least as
     /// many bits as `Self`.
-    fn into_fp<T: Num, F: Num<Raw = T>>(self) -> F
-    where
-        T: TryFrom<Self::Raw>,
-    {
+    fn into_fp<F: Num<Raw: TryFrom<Self::Raw>>>(self) -> F {
         F::from_fp(self)
     }
     /// Increase the number of bits used to represent this value. Both the raw and logical
     /// values are unchanged.  This is a type system operation only.
     /// Compilation will fail if the new number of bits is too large for the raw type.
-    fn add_bits<const N: u32>(self) -> Self::Output<{ Self::BITS + N }, { Self::SHIFT }>
-    where
-        [(); (Self::BITS + N) as usize]:,
-    {
-        unsafe { Self::Output::new_unchecked(self.raw()) }
+    fn add_bits<T: Num<Raw = Self::Raw>>(self) -> T {
+        unsafe { T::new_unchecked(self.raw()) }
     }
     /// Set the number of bits used to represent this value. The value is checked
     /// at runtime to ensure it is in range for the new number of bits. If succesful,
     /// both the raw and logical values are unchanged.
-    fn set_bits<const N: u32>(self) -> Result<Self::Output<N, { Self::SHIFT }>, RangeError> {
-        Self::Output::new(self.raw())
+    fn set_bits<T: Num<Raw = Self::Raw>>(self) -> Result<T, RangeError> {
+        const {
+            assert!(Self::SHIFT == T::SHIFT);
+            assert!(Self::SIGNED == T::SIGNED);
+        }
+        T::new(self.raw())
     }
     /// Set the number of bits used to represent this value.  Unsafe: no bounds checking
     /// is performed; the caller must ensure that the value fits within
@@ -170,57 +184,107 @@ pub trait Num: Clone + Copy + Debug + Eq + Ord + PartialEq + PartialOrd + Sized 
     /// instead, so that an out-of-bounds
     /// value panics with a reasonable message instead of propagating undefined
     /// behavior.
-    unsafe fn set_bits_unchecked<const N: u32>(self) -> Self::Output<N, { Self::SHIFT }> {
-        unsafe { Self::Output::new_unchecked(self.raw()) }
+    unsafe fn set_bits_unchecked<T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            assert!(Self::SHIFT == T::SHIFT);
+            assert!(Self::SIGNED == T::SIGNED);
+        }
+        unsafe { T::new_unchecked(self.raw()) }
     }
     /// Set the number of bits used to represent this value, saturating in case of
     /// overflow.
-    fn saturate<const N: u32>(self) -> Self::Output<N, { Self::SHIFT }> {
-        match Self::Output::new(self.raw()) {
-            Err(RangeError::TooSmall) => Self::Output::MIN,
-            Err(RangeError::TooLarge) => Self::Output::MAX,
+    fn saturate<T: Num<Raw = Self::Raw>>(self) -> T {
+        match self.set_bits::<T>() {
+            Err(RangeError::TooSmall) => T::MIN,
+            Err(RangeError::TooLarge) => T::MAX,
             Ok(val) => val,
         }
     }
     /// Shift the logical value of this number left by N bits. (N may be negative
     /// for a right shift).  This is a type system operation only; the raw value
     /// is unchanged.  The logical value is multiplied by 2^N.
-    fn logical_shl<const N: i32>(self) -> Self::Output<{ Self::BITS }, { Self::SHIFT - N }>
-    where
-        [(); (Self::SHIFT - N) as usize]:,
-    {
-        unsafe { Self::Output::new_unchecked(self.raw()) }
+    fn logical_shl<const N: i32, T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            assert!(T::BITS >= Self::BITS);
+            assert!(T::SHIFT == Self::SHIFT - N);
+            assert!(T::SIGNED == Self::SIGNED);
+        }
+        unsafe { T::new_unchecked(self.raw()) }
     }
     /// Shift the logical value of this number right by N bits. (N may be negative
     /// for a left shift).  This is a type system operation only; the raw value
     /// is unchanged.  The logical value is divided by 2^N.
-    fn logical_shr<const N: i32>(self) -> Self::Output<{ Self::BITS }, { Self::SHIFT + N }>
-    where
-        [(); (Self::SHIFT + N) as usize]:,
-    {
-        unsafe { Self::Output::new_unchecked(self.raw()) }
+    fn logical_shr<const N: i32, T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            assert!(T::BITS >= Self::BITS);
+            assert!(T::SHIFT == Self::SHIFT + N);
+            assert!(T::SIGNED == Self::SIGNED);
+        }
+        unsafe { T::new_unchecked(self.raw()) }
     }
     /// Shift the raw value of this number left by N bits. Compiles to a left shift.
     /// The logical value is unchanged.
-    fn raw_shl<const N: u32>(self) -> Self::Output<{ Self::BITS + N }, { Self::SHIFT + N as i32 }>
-    where
-        [(); (Self::BITS + N) as usize]:,
-        [(); (Self::SHIFT + N as i32) as usize]:,
-    {
-        unsafe { Self::Output::new_unchecked(self.raw() << N) }
+    fn raw_shl<const N: u32, T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            assert!(T::BITS - Self::BITS >= N);
+            assert!((T::SHIFT - Self::SHIFT) as u32 == N);
+            assert!(T::SIGNED == Self::SIGNED);
+        }
+        unsafe { T::new_unchecked(self.raw() << N) }
     }
     /// Shift the raw value of this number right by N bits. Compiles to a right shift.
     /// The logical value is unchanged, except for truncation of the N least-significant bits.
-    fn raw_shr<const N: u32>(self) -> Self::Output<{ Self::BITS - N }, { Self::SHIFT - N as i32 }>
+    fn raw_shr<const N: u32, T: Num<Raw = Self::Raw>>(self) -> T {
+        const {
+            assert!(Self::BITS - T::BITS <= N);
+            assert!((Self::SHIFT - T::SHIFT) as u32 == N);
+            assert!(T::SIGNED == Self::SIGNED);
+        }
+        unsafe { T::new_unchecked(self.raw() >> N) }
+    }
+
+    // todo: generalize the trait bounds to allow adding and subtrating signed/unsigned?
+    fn add<Other: Num, Output: Num>(self, other: Other) -> Output
     where
-        [(); (Self::BITS - N) as usize]:,
-        [(); (Self::SHIFT - N as i32) as usize]:,
+        Self::Raw: core::ops::Add<Other::Raw, Output = Output::Raw>,
     {
-        unsafe { Self::Output::new_unchecked(self.raw() >> N) }
+        const {
+            assert!(Output::SHIFT == Self::SHIFT);
+            assert!(Output::SHIFT == Other::SHIFT);
+            if Output::SIGNED {
+                assert!(Output::BITS > Self::BITS + !Self::SIGNED as u32);
+                assert!(Output::BITS > Other::BITS + !Other::SIGNED as u32);
+            } else {
+                assert!(Self::SIGNED == false);
+                assert!(Other::SIGNED == false);
+                assert!(Output::BITS > Self::BITS);
+                assert!(Output::BITS > Other::BITS);
+            }
+        }
+        unsafe { Output::new_unchecked(self.raw() + other.raw()) }
+    }
+
+    fn sub<Other: Num, Output: Num>(self, other: Other) -> Output
+    where
+        Self::Raw: TryInto<Output::Raw>,
+        Other::Raw: TryInto<Output::Raw>,
+        Output::Raw: core::ops::Sub<Output::Raw, Output = Output::Raw>,
+    {
+        const {
+            assert!(Output::SHIFT == Self::SHIFT);
+            assert!(Output::SHIFT == Other::SHIFT);
+            assert!(Output::SIGNED);
+            assert!(Output::BITS > Self::BITS + (Self::SIGNED != Other::SIGNED) as u32);
+            assert!(Output::BITS > Other::BITS + (Self::SIGNED != Other::SIGNED) as u32);
+        }
+        unsafe {
+            Output::new_unchecked(
+                self.raw().try_into().unwrap_unchecked()
+                    - other.raw().try_into().unwrap_unchecked(),
+            )
+        }
     }
 }
 
-mod num_impl;
-pub use num_impl::*;
-mod add_sub;
-mod mul_div;
+mod types;
+pub use types::*;
